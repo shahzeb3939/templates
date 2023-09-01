@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+
+  DynamoDBTableCrh:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: crh-temp
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      Tags:
+        - Key: Provisioner
+          Value: CloudFormation
+
+  LambdaFunctionCrhBe:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: crh-be-temp
+      Handler: main
+      PackageType: Zip
+      Architectures:
+        - x86_64
+      Role: arn:aws:iam::654578497811:role/service-role/crh-be-executor
+      Runtime: go1.x
+      Code:
+        S3Bucket: crh-be-build
+        S3Key: main.zip
+      Tags:
+        - Key: Provisioner
+          Value: CloudFormation
+    DependsOn:
+      - S3BucketCrhBeBuild
+
+  S3BucketCrhBeBuild:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: crh-be-build-temp
+      Tags:
+        - Key: Provisioner
+          Value: CloudFormation

@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  LambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: lambda-barebone
+      Handler: main
+      PackageType: Zip
+      Architectures:
+        - x86_64
+      Role: arn:aws:iam::654578497811:role/service-role/crh-be-executor
+      Runtime: go1.x
+      Code:
+        S3Bucket: crh-be-build
+        S3Key: main.zip
+      Tags:
+        - Key: Provisioner
+          Value: CloudFormation

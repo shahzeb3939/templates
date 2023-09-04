@@ -11,6 +11,9 @@ Resources:
         IgnorePublicAcls: false
         BlockPublicPolicy: false
         RestrictPublicBuckets: false
+      Tags:
+        - Key: Provisioner
+          Value: CloudFormation
 
   MyBucketPolicy:
     Type: 'AWS::S3::BucketPolicy'
@@ -24,3 +27,6 @@ Resources:
             Principal: '*'
             Action: 's3:GetObject'
             Resource: !Sub 'arn:aws:s3:::${MyS3Bucket}/*'
+      Tags:
+        - Key: Provisioner
+          Value: CloudFormation

@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  AWSLambdaBasicExecutionPolicy:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      PolicyName: AWSLambdaBasicExecutionRolePolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: logs:CreateLogGroup
+            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/crh-be:*'
+      RoleName: !Ref CRHBEExecutorBBRole
+
+  CRHBEExecutorBBRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: crh-be-executor-bb-role-policy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole

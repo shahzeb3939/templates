@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Resources:
+
+  CrhBeLambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: crh-be-lwrd
+      Handler: main
+      PackageType: Zip
+      Architectures:
+        - x86_64
+      Role: !GetAtt CrhBeExecutorIamRole.Arn
+      Runtime: go1.x
+      Code:
+        S3Bucket: crh-be-build
+        S3Key: main.zip
+      Tags:
+        - Key: Provisioner
+          Value: CloudFormation
+      
+  AWSLambdaBasicExecutionIamManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: aws-lambda-basic-execution-lwrd
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: logs:CreateLogGroup
+            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${CrhBeLambdaFunction}:*'
+      Roles:
+        - !Ref CrhBeExecutorIamRole
+
+  AWSLambdaMicroserviceExecutionIamManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: aws-lambda-microservice-execution-lwrd
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'dynamodb:PutItem'
+              - 'dynamodb:PartiQLSelect'
+              - 'dynamodb:DescribeTable'
+              - 'dynamodb:DeleteItem'
+              - 'dynamodb:GetItem'
+              - 'dynamodb:Scan'
+              - 'dynamodb:Query'
+              - 'dynamodb:UpdateItem'
+            Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/*'
+
+          - Effect: Allow
+            Action:
+              - 'dynamodb:ListTables'
+            Resource: '*'
+      Roles:
+        - !Ref CrhBeExecutorIamRole
+
+  CrhBeExecutorIamRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: crh-be-executor-lwrd
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+
+  CrhDynamodbTable:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: crh-lwrd
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      Tags:
+        - Key: Provisioner
+          Value: CloudFormation

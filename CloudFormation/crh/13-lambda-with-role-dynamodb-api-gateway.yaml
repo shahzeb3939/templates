@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Resources:
+
+  CrhBeLambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: crh-be-lwrdag
+      Handler: main
+      PackageType: Zip
+      Architectures:
+        - x86_64
+      Role: !GetAtt CrhBeExecutorIamRole.Arn
+      Runtime: go1.x
+      Code:
+        S3Bucket: crh-be-build
+        S3Key: main.zip
+      Tags:
+        - Key: Provisioner
+          Value: CloudFormation
+      
+  AWSLambdaBasicExecutionIamManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: aws-lambda-basic-execution-lwrdag
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: logs:CreateLogGroup
+            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${CrhBeLambdaFunction}:*'
+      Roles:
+        - !Ref CrhBeExecutorIamRole
+
+  AWSLambdaMicroserviceExecutionIamManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: aws-lambda-microservice-execution-lwrdag
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'dynamodb:PutItem'
+              - 'dynamodb:PartiQLSelect'
+              - 'dynamodb:DescribeTable'
+              - 'dynamodb:DeleteItem'
+              - 'dynamodb:GetItem'
+              - 'dynamodb:Scan'
+              - 'dynamodb:Query'
+              - 'dynamodb:UpdateItem'
+            Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/*'
+
+          - Effect: Allow
+            Action:
+              - 'dynamodb:ListTables'
+            Resource: '*'
+      Roles:
+        - !Ref CrhBeExecutorIamRole
+
+  CrhBeExecutorIamRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: crh-be-executor-lwrdag
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+
+  CrhDynamodbTable:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: crh-lwrdag
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      Tags:
+        - Key: Provisioner
+          Value: CloudFormation
+
+  CrhApiGatewayV2Api:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: crh-lwrdag
+      ProtocolType: HTTP
+
+  CrhBeLambdaFunctionApiGatewayV2Integration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref CrhApiGatewayV2Api
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${CrhBeLambdaFunction}/invocations
+      PayloadFormatVersion: '2.0'
+
+  CrhBeApiGatewayV2Route:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref CrhApiGatewayV2Api
+      RouteKey: ANY /crh-be-lwrdag
+      Target: !Sub integrations/${CrhBeLambdaFunctionApiGatewayV2Integration}
+    
+  DefaultApiGatewayV2Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref CrhApiGatewayV2Api
+      AutoDeploy: true
+      StageName: $default
+
+  CrhBeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CrhBeLambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${CrhApiGatewayV2Api}/*/*

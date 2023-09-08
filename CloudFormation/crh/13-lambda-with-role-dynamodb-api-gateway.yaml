@@ -1,6 +1,18 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
+Parameters:
+
+  ApiGatewayRoute:
+    Description: The API Gateway route path
+    Type: String
+    Default: crh-be-lwrdag
+
 Resources:
+
+  S3Bucket:
+      Type: 'AWS::S3::Bucket'
+      Properties:
+        BucketName: crh-be-build-lwrdag
 
   CrhBeLambdaFunction:
     Type: 'AWS::Lambda::Function'
@@ -13,8 +25,11 @@ Resources:
       Role: !GetAtt CrhBeExecutorIamRole.Arn
       Runtime: go1.x
       Code:
-        S3Bucket: crh-be-build
+        S3Bucket: crh-be-build-lwrdag
         S3Key: main.zip
+      Environment:
+        Variables:
+            dynamodbTable: !Ref CrhDynamodbTable
       Tags:
         - Key: Provisioner
           Value: CloudFormation
@@ -111,7 +126,7 @@ Resources:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref CrhApiGatewayV2Api
-      RouteKey: ANY /crh-be-lwrdag
+      RouteKey: !Sub ANY /${ApiGatewayRoute}
       Target: !Sub integrations/${CrhBeLambdaFunctionApiGatewayV2Integration}
     
   DefaultApiGatewayV2Stage:
@@ -128,3 +143,10 @@ Resources:
       FunctionName: !Ref CrhBeLambdaFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${CrhApiGatewayV2Api}/*/*
+
+Outputs:
+
+  CrhApiGatewayV2InvokeUrl:
+    Description: Invoke URL of the API Gateway
+    Value:
+      Fn::Sub: "https://${CrhApiGatewayV2Api}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayRoute}"
